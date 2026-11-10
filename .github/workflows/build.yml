@@ -30,7 +30,7 @@ jobs:
       - name: Inspect architecture and ad hoc signature
         run: |
           set -euo pipefail
-          xcrun lipo -verify_arch arm64 arm64e dist/XCreatorStudioZH.dylib
+          xcrun lipo dist/XCreatorStudioZH.dylib -verify_arch arm64 arm64e
           codesign --force --sign - dist/XCreatorStudioZH.dylib
           codesign --verify --strict dist/XCreatorStudioZH.dylib
           file dist/XCreatorStudioZH.dylib
