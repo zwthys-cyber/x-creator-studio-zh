@@ -52,7 +52,7 @@ jobs:
             -mios-simulator-version-min=15.0 -fobjc-arc -fmodules \
             tests/FixtureApp.m -framework UIKit -framework Foundation \
             -framework WebKit -framework QuartzCore -o fixture.app/Fixture
-          python3 -c 'import plistlib; plistlib.dump(dict(CFBundleExecutable="Fixture", CFBundleIdentifier="dev.xcszh.fixture", CFBundleName="Fixture", CFBundlePackageType="APPL", CFBundleVersion="1", CFBundleShortVersionString="0.2", LSRequiresIPhoneOS=True, UIDeviceFamily=[1,2], UILaunchScreen={}), open("fixture.app/Info.plist","wb"))'
+          python3 -c 'import plistlib; plistlib.dump(dict(CFBundleExecutable="Fixture", CFBundleIdentifier="dev.xcszh.fixture", CFBundleName="Fixture", CFBundlePackageType="APPL", CFBundleVersion="1", CFBundleShortVersionString="0.3", LSRequiresIPhoneOS=True, UIDeviceFamily=[1,2], UILaunchScreen={}), open("fixture.app/Info.plist","wb"))'
           codesign --force --sign - fixture.app
           xcrun simctl install "$DEVICE" fixture.app
           xcrun simctl launch "$DEVICE" dev.xcszh.fixture
@@ -66,7 +66,7 @@ jobs:
           python3 -c 'import json; r=json.load(open("dist/FIXTURE_RESULTS.json")); assert r["passed"], r'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: XCreatorStudioZH-v0.2
+          name: XCreatorStudioZH-v0.3
           path: dist/
           retention-days: 14
           if-no-files-found: error
