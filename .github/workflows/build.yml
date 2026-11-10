@@ -1,0 +1,46 @@
+name: Build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Compile iOS dynamic library
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          for ARCH in arm64 arm64e; do
+            xcrun --sdk iphoneos clang -arch "$ARCH" -isysroot "$SDK" \
+              -miphoneos-version-min=15.0 -fobjc-arc -fmodules \
+              -Wall -Wextra -Werror -dynamiclib src/XCreatorStudioZH.m \
+              -framework Foundation -framework UIKit \
+              -install_name @rpath/XCreatorStudioZH.dylib \
+              -o "dist/plugin-$ARCH.dylib"
+          done
+          xcrun lipo -create dist/plugin-arm64.dylib dist/plugin-arm64e.dylib -output dist/XCreatorStudioZH.dylib
+          rm dist/plugin-arm64.dylib dist/plugin-arm64e.dylib
+      - name: Inspect architecture and ad hoc signature
+        run: |
+          set -euo pipefail
+          xcrun lipo -verify_arch arm64 arm64e dist/XCreatorStudioZH.dylib
+          codesign --force --sign - dist/XCreatorStudioZH.dylib
+          codesign --verify --strict dist/XCreatorStudioZH.dylib
+          file dist/XCreatorStudioZH.dylib
+          cp README.md dist/
+          echo "$GITHUB_SHA" > dist/SOURCE_COMMIT
+          cd dist
+          shasum -a 256 XCreatorStudioZH.dylib > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: XCreatorStudioZH
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
