@@ -163,6 +163,7 @@ static void LocalizeWindow(UIWindow *window) {
     for (UIView *view in views) {
         // Leave user-editable text untouched.
         if ([view isKindOfClass:UITextView.class] || [view isKindOfClass:UITextField.class]) continue;
+        NSUInteger before = NativeChanges;
         TranslateObject(view);
         TranslateObject(DisplayNode(view));
         if ([view isKindOfClass:UIButton.class]) {
@@ -175,8 +176,10 @@ static void LocalizeWindow(UIWindow *window) {
         }
         NSString *accessible = Replacement(view.accessibilityLabel);
         if (accessible) view.accessibilityLabel = accessible;
-        [view invalidateIntrinsicContentSize];
-        [view setNeedsLayout];
+        if (NativeChanges != before) {
+            [view invalidateIntrinsicContentSize];
+            [view setNeedsLayout];
+        }
     }
     TranslateLayer(window.layer);
     NSString *title = Replacement(controller.title);
@@ -214,6 +217,10 @@ static void LocalizeWindow(UIWindow *window) {
     // Older app lifecycle may not register UIWindowScene instances.
     id delegateWindow = ObjectGetter(UIApplication.sharedApplication.delegate, @selector(window));
     if ([delegateWindow isKindOfClass:UIWindow.class]) [windows addObject:delegateWindow];
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    [windows addObjectsFromArray:UIApplication.sharedApplication.windows];
+#pragma clang diagnostic pop
     for (UIWindow *window in windows) {
         LocalizeWindow(window);
         if (window.hidden || !window.isKeyWindow || !window.rootViewController) continue;
