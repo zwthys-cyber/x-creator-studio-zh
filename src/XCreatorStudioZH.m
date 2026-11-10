@@ -45,7 +45,7 @@ static BOOL HasText(NSSet *texts, NSString *english) {
 
 static void TranslateLabel(UILabel *label) {
     NSString *old = label.text;
-    NSString *replacement = Translations()[old];
+    NSString *replacement = old ? Translations()[old] : nil;
     if (!replacement) return;
     NSAttributedString *attributed = label.attributedText;
     if (attributed.length) {
@@ -81,7 +81,7 @@ static void LocalizeWindow(UIWindow *window) {
             for (NSNumber *state in @[@(UIControlStateNormal), @(UIControlStateHighlighted),
                                       @(UIControlStateSelected), @(UIControlStateDisabled)]) {
                 NSString *old = [button titleForState:state.unsignedIntegerValue];
-                NSString *replacement = Translations()[old];
+                NSString *replacement = old ? Translations()[old] : nil;
                 if (replacement) [button setTitle:replacement forState:state.unsignedIntegerValue];
             }
         }
