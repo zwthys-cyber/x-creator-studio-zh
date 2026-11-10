@@ -1,17 +1,23 @@
-# X Creator Studio 中文适配
+# X Creator Studio 中文适配 v0.2
 
-为 X iOS 的 Creator Studio（创作者工作室）菜单提供简体中文文案。仅在检测到页面标题、原创内容奖励、创作者学院和工具等特征后处理可见 UIKit 标签和按钮；不会改变资格状态或解锁收益功能。
+为 X iOS 的创作者工作室菜单提供简体中文。支持标准 UIKit 文字、Texture 风格节点、CATextLayer 和 WKWebView 文本。仅匹配页面标题及至少一个专属菜单特征后处理词典内的完整文案，不改变资格状态或解锁收益功能。尚未证明真实 X 页面使用上述哪种渲染方式。
 
-## 下载和安装
+## 巨魔注入器
 
-在 Actions 的 Build 页面下载成功任务的 XCreatorStudioZH 压缩包，解压取得 XCreatorStudioZH.dylib。使用支持注入动态库的 IPA 签名工具（例如你现有的签名工具）将其注入已解密的 X IPA，重新签名后安装。单独安装 dylib 不会生效。默认仅在原始 bundle ID com.atebits.Tweetie2 下启用；克隆包修改 bundle ID 需要相应修改源码。
+从成功的 Actions 任务下载 XCreatorStudioZH-v0.2，解压出 XCreatorStudioZH.dylib。移除上一版插件，再用巨魔注入器将新版注入当前安装的 X 主程序，按工具提示完成安装。退出 X 后从桌面重新启动。多开包修改 Bundle ID 也可启用；插件不要注入应用扩展或其他应用。
 
-插件不依赖 MobileSubstrate，不包含 X IPA、Apple 凭据或解密材料。原始 IPA 参考任务：https://github.com/zwthys-cyber/ipa-decrypt-lab/actions/runs/42738640961 。该任务的加密 IPA 不能直接作为普通 IPA 注入。
+启动时顶部应显示五秒“中文插件 v0.2 已加载”。没有提示表示尚未确认加载，需检查注入目标和实际安装版本，不能据此认定中文匹配失败。有提示但仍是英文时，在页面上三指长按约 1.2 秒，查看“中文插件诊断”中的原生/网页替换次数及页面类型。诊断仅本机显示，不联网、不自动上传、不读取帖子内容。
+
+## v0.1 的已知问题
+
+旧版限制了原始 Bundle ID，只扫描 UILabel/UIButton，且要求四个菜单特征同时存在；在克隆包、网页、非标准文字节点或部分菜单未加载时可能完全不工作。v0.2 去除 Bundle ID 限制，放宽为标题加一个专属特征，补充不同文字路径和加载提示。用户已反馈 v0.1 实际页面仍显示英文。
 
 ## 验证范围
 
-GitHub Actions 编译 arm64 / arm64e，检查 Mach-O 架构并验证临时签名。CI 通过只证明编译和静态结构通过，不证明你的 X 版本页面已实际中文化。尚未用真实 IPA 或设备验证；若页面使用非 UIKit 绘制或文案改变，可能无法匹配。请安装后打开截图中的页面确认效果，再报告仍显示英文的区域。
+GitHub Actions 编译 arm64/arm64e，检查架构和临时签名；使用合成 iOS 模拟器页面验证原生文字、空白归一化、文字样式、仿 Texture 节点、CATextLayer、WKWebView、重复扫描和无关页面排除。
+
+这些检查不等于真实 X IPA 或设备验证。真实页面仍可能使用其他绘制方式，插件未成功加载也无法翻译。原始 IPA 参考任务：https://github.com/zwthys-cyber/ipa-decrypt-lab/actions/runs/42738640961 。插件不包含 IPA 或解密材料，未读取该任务的 IPA 明文。
 
 ## 开发约束
 
-所有编译、运行、自动测试和产物验证仅允许在 GitHub 托管 Actions runner 上进行。当前服务器仅允许编辑文件和调用 GitHub API，不允许运行项目、安装编译依赖或测试。源码直接通过 GitHub API 维护。公开产物仅含本项目插件。
+所有编译、项目运行、自动测试和产物验证仅允许在 GitHub 托管 Actions runner 上进行。当前服务器只编辑文件和调用 GitHub API，不运行项目、不安装编译依赖、不做测试。源码通过 GitHub API 维护；公开产物仅含本项目插件和合成测试结果。
