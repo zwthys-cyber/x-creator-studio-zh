@@ -402,7 +402,21 @@ static NSString *DiagnosticReport(UIWindow *window) {
         return [a compare:b];
     }];
     for (NSString *name in names) [report appendFormat:@"%@ × %@\n", name, classes[name]];
-    [report appendString:@"\n文字相关接口（仅名称）：\n"];
+    [report appendString:@"\nJetfuel 文字框详情：\n"];
+    for (UIView *view in views) {
+        if (!IsJetfuelHost(view)) continue;
+        NSMutableArray *inks = [NSMutableArray array];
+        FindInk(view, inks, 0);
+        NSString *key = JetfuelMenuKey(view, inks);
+        XCSZHJetfuelState *state = objc_getAssociatedObject(view, &JetfuelStateKey);
+        NSMutableArray *children = [NSMutableArray array];
+        for (UIView *child in view.subviews)
+            if (!objc_getAssociatedObject(child, &BannerKey)) [children addObject:NSStringFromClass(child.class)];
+        [report appendFormat:@"%@ 框=%@ ink=%lu 中文层=%@ 子视图=%@\\n",
+            key ?: @"<未命中词典>", NSStringFromCGRect(view.bounds), (unsigned long)inks.count,
+            state.label.superview == view ? @"是" : @"否", [children componentsJoinedByString:@","]];
+    }
+    [report appendString:@"\\n文字相关接口（仅名称）：\\n"];
     NSUInteger detailed = 0;
     for (NSString *name in names) {
         NSString *lower = name.lowercaseString;
