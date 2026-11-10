@@ -17,6 +17,16 @@
 @end
 @implementation FixtureLayer
 @end
+@interface FixtureJetfuelInkBase : UIView
+@property(nonatomic, copy) NSString *fixtureEnglish;
+@end
+@implementation FixtureJetfuelInkBase
+- (void)drawRect:(CGRect)rect {
+    [self.fixtureEnglish drawInRect:rect withAttributes:@{
+        NSFontAttributeName: [UIFont systemFontOfSize:18],
+        NSForegroundColorAttributeName: UIColor.redColor}];
+}
+@end
 @interface FixtureApp : UIResponder <UIApplicationDelegate>
 @property(nonatomic, strong) UIWindow *window;
 @property(nonatomic, strong) WKWebView *web;
@@ -104,7 +114,7 @@
     [self check:hit == overlay.toggleButton || [hit isDescendantOfView:overlay.toggleButton]
         name:@"diagnostic button receives touches in separate window"];
     [overlay.toggleButton sendActionsForControlEvents:UIControlEventTouchUpInside];
-    [self check:!overlay.panel.hidden && [overlay.reportView.text containsString:@"版本 0.3"]
+    [self check:!overlay.panel.hidden && [overlay.reportView.text containsString:@"版本 0.4"]
         name:@"tapping diagnostic button opens report without presentation"];
     [overlay.toggleButton sendActionsForControlEvents:UIControlEventTouchUpInside];
     [self check:overlay.panel.hidden name:@"diagnostic button closes report"];
@@ -112,6 +122,98 @@
         name:@"outside diagnostic controls passes through"];
     [self check:self.window.isKeyWindow name:@"overlay preserves app key window"];
     DiagnosticWindow.hidden = YES;
+
+
+    // Recreate the user's actual diagnostic: accessible menu text, no text setter,
+    // no Texture nodes and no web views; custom glyphs live inside TextInkView.
+    [backing removeFromSuperlayer];
+    for (UIView *view in [self.window.rootViewController.view.subviews copy]) [view removeFromSuperview];
+    self.window.rootViewController.view.backgroundColor = UIColor.systemBackgroundColor;
+    Class displayClass = objc_allocateClassPair(UIView.class, "JetfuelSDK.TextDisplayView", 0);
+    objc_registerClassPair(displayClass);
+    Class inkClass = objc_allocateClassPair(FixtureJetfuelInkBase.class, "JetfuelSDK.FixtureTextInkView", 0);
+    objc_registerClassPair(inkClass);
+    NSArray *menu = @[@"Creator Studio", @"Programs", @"Original Content Rewards", @"Earn from your posts",
+        @"Ineligible", @"Subscriptions", @"Ineligible", @"Tools", @"Analytics", @"Inspiration",
+        @"Top posts by engagement", @"Creator Academy", @"Tips and guides for creators", @"New",
+        @"Support", @"Contact support", @"Learn more"];
+    NSMutableArray<UIView *> *hosts = [NSMutableArray array];
+    NSMutableArray<UIView *> *inkViews = [NSMutableArray array];
+    NSUInteger countBefore = JetfuelChanges;
+    for (NSUInteger index = 0; index < menu.count; index++) {
+        UIView *host = [[displayClass alloc] initWithFrame:CGRectMake(20, 72 + index * 32, 310, 28)];
+        host.accessibilityLabel = menu[index];
+        FixtureJetfuelInkBase *ink = [[inkClass alloc] initWithFrame:host.bounds];
+        ink.fixtureEnglish = menu[index];
+        ink.alpha = 0.8;
+        ink.userInteractionEnabled = NO;
+        [host addSubview:ink];
+        [self.window.rootViewController.view addSubview:host];
+        [hosts addObject:host];
+        [inkViews addObject:ink];
+    }
+    CGRect originalFrame = hosts.firstObject.frame;
+    UITapGestureRecognizer *rowTap = [[UITapGestureRecognizer alloc] initWithTarget:nil action:NULL];
+    [hosts.firstObject addGestureRecognizer:rowTap];
+    [self check:![hosts.firstObject respondsToSelector:@selector(setText:)] &&
+        ![hosts.firstObject respondsToSelector:@selector(setAttributedText:)] name:@"Jetfuel fixture has no UIKit text setters"];
+    LocalizeWindow(self.window);
+    [self check:JetfuelChanges == countBefore + menu.count name:@"all 17 self-drawn menu labels translated"];
+    for (NSUInteger index = 0; index < hosts.count; index++) {
+        XCSZHJetfuelState *state = objc_getAssociatedObject(hosts[index], &JetfuelStateKey);
+        [self check:[state.label.text isEqualToString:Translations()[menu[index]]] name:@"Jetfuel visible Chinese label"];
+        [self check:inkViews[index].alpha == 0 name:@"original English ink suppressed"];
+        [self check:!state.label.userInteractionEnabled name:@"translated text does not capture menu touches"];
+    }
+    [self check:CGRectEqualToRect(originalFrame, hosts.firstObject.frame) &&
+        [hosts.firstObject.gestureRecognizers containsObject:rowTap] name:@"host geometry and tap recognizer retained"];
+    NSUInteger jetfuelBefore = JetfuelChanges;
+    LocalizeWindow(self.window);
+    [self check:JetfuelChanges == jetfuelBefore name:@"Jetfuel repeat scan idempotent"];
+    [self.window layoutIfNeeded];
+    for (UIView *host in hosts) {
+        XCSZHJetfuelState *state = objc_getAssociatedObject(host, &JetfuelStateKey);
+        [state.label.layer displayIfNeeded];
+    }
+    [CATransaction flush];
+    UIImage *light = [[[UIGraphicsImageRenderer alloc] initWithBounds:self.window.bounds]
+        imageWithActions:^(UIGraphicsImageRendererContext *context) {
+            [self.window.layer renderInContext:context.CGContext];
+        }];
+    [UIImagePNGRepresentation(light) writeToFile:[NSHomeDirectory()
+        stringByAppendingPathComponent:@"Documents/JETFUEL_LIGHT.png"] atomically:YES];
+    self.window.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    LocalizeWindow(self.window);
+    [self.window layoutIfNeeded];
+    for (UIView *host in hosts) {
+        XCSZHJetfuelState *state = objc_getAssociatedObject(host, &JetfuelStateKey);
+        [state.label setNeedsDisplay];
+        [state.label.layer displayIfNeeded];
+    }
+    [CATransaction flush];
+    UIImage *dark = [[[UIGraphicsImageRenderer alloc] initWithBounds:self.window.bounds]
+        imageWithActions:^(UIGraphicsImageRendererContext *context) {
+            [self.window.layer renderInContext:context.CGContext];
+        }];
+    [UIImagePNGRepresentation(dark) writeToFile:[NSHomeDirectory()
+        stringByAppendingPathComponent:@"Documents/JETFUEL_DARK.png"] atomically:YES];
+    self.window.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;
+    hosts.firstObject.accessibilityLabel = @"UNRELATED_REUSED_TEXT";
+    LocalizeWindow(self.window);
+    [self check:!objc_getAssociatedObject(hosts.firstObject, &JetfuelStateKey) &&
+        fabs(inkViews.firstObject.alpha - 0.8) < 0.001 name:@"reused non-menu view restored"];
+    [self check:[hosts.firstObject.accessibilityLabel isEqualToString:@"UNRELATED_REUSED_TEXT"]
+        name:@"reused accessibility text preserved"];
+    hosts.firstObject.accessibilityLabel = @"Inspiration";
+    LocalizeWindow(self.window);
+    XCSZHJetfuelState *reused = objc_getAssociatedObject(hosts.firstObject, &JetfuelStateKey);
+    [self check:[reused.label.text isEqualToString:@"创作灵感"] name:@"reused menu view updates Chinese"];
+    self.window.rootViewController = [UIViewController new];
+    LocalizeWindow(self.window);
+    for (NSUInteger index = 0; index < hosts.count; index++) {
+        [self check:!objc_getAssociatedObject(hosts[index], &JetfuelStateKey) &&
+            fabs(inkViews[index].alpha - 0.8) < 0.001 name:@"page exit restores custom ink and removes translation"];
+    }
 
     self.web = [[WKWebView alloc] initWithFrame:CGRectMake(0, 300, 350, 300)];
     [self.window.rootViewController.view addSubview:self.web];

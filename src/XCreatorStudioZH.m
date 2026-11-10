@@ -146,6 +146,129 @@ static void TranslateLayer(CALayer *layer) {
     }
     for (CALayer *child in layer.sublayers) TranslateLayer(child);
 }
+
+static char JetfuelStateKey;
+static NSUInteger JetfuelChanges;
+static NSHashTable<UIView *> *JetfuelHosts;
+
+@interface XCSZHJetfuelState : NSObject
+@property(nonatomic, strong) UILabel *label;
+@property(nonatomic, strong) NSMapTable<UIView *, NSNumber *> *inkAlphas;
+@property(nonatomic, copy) NSString *english;
+@property(nonatomic, copy) NSString *originalAccessibility;
+@end
+@implementation XCSZHJetfuelState
+@end
+
+static BOOL IsJetfuelHost(UIView *view) {
+    return [NSStringFromClass(view.class) isEqualToString:@"JetfuelSDK.TextDisplayView"];
+}
+static BOOL IsJetfuelInk(UIView *view) {
+    NSString *name = NSStringFromClass(view.class);
+    return [name containsString:@"JetfuelSDK"] && [name containsString:@"TextInkView"];
+}
+static NSString *CanonicalMenuKey(NSString *value) {
+    NSString *key = Normalize(value);
+    if (!key.length) return nil;
+    if (Translations()[key]) return key;
+    for (NSString *english in Translations())
+        if ([Translations()[english] isEqualToString:key]) return english;
+    return nil;
+}
+static void FindInk(UIView *view, NSMutableArray<UIView *> *result, NSUInteger depth) {
+    if (depth > 16) return;
+    for (UIView *child in view.subviews) {
+        if (objc_getAssociatedObject(child, &BannerKey)) continue;
+        if (IsJetfuelInk(child)) [result addObject:child];
+        else FindInk(child, result, depth + 1);
+    }
+}
+static NSString *JetfuelMenuKey(UIView *view, NSArray<UIView *> *inks) {
+    NSString *key = CanonicalMenuKey(view.accessibilityLabel);
+    if (!key) key = CanonicalMenuKey(view.accessibilityAttributedLabel.string);
+    if (key) return key;
+    for (UIView *ink in inks) {
+        key = CanonicalMenuKey(ink.accessibilityLabel);
+        if (key) return key;
+    }
+    return nil;
+}
+static void RestoreJetfuel(UIView *view) {
+    XCSZHJetfuelState *state = objc_getAssociatedObject(view, &JetfuelStateKey);
+    if (!state) return;
+    for (UIView *ink in state.inkAlphas) ink.alpha = [[state.inkAlphas objectForKey:ink] doubleValue];
+    if ([view.accessibilityLabel isEqualToString:Translations()[state.english]])
+        view.accessibilityLabel = state.originalAccessibility;
+    [state.label removeFromSuperview];
+    objc_setAssociatedObject(view, &JetfuelStateKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+static void CleanupJetfuel(UIWindow *window, NSSet<UIView *> *active) {
+    for (UIView *host in JetfuelHosts.allObjects) {
+        if ((!host.window || host.window == window) && ![active containsObject:host]) RestoreJetfuel(host);
+    }
+}
+static BOOL TranslateJetfuel(UIView *view) {
+    if (!IsJetfuelHost(view) || !view.window || CGRectIsEmpty(view.bounds)) return NO;
+    CGRect visible = [view convertRect:view.bounds toView:view.window];
+    if (!CGRectIntersectsRect(visible, view.window.bounds)) return NO;
+    NSMutableArray<UIView *> *inks = [NSMutableArray array];
+    FindInk(view, inks, 0);
+    NSString *english = JetfuelMenuKey(view, inks);
+    if (!english || !inks.count) { RestoreJetfuel(view); return NO; }
+    XCSZHJetfuelState *state = objc_getAssociatedObject(view, &JetfuelStateKey);
+    if (!state) {
+        state = [XCSZHJetfuelState new];
+        state.inkAlphas = [NSMapTable weakToStrongObjectsMapTable];
+        state.originalAccessibility = view.accessibilityLabel;
+        state.label = [[UILabel alloc] initWithFrame:view.bounds];
+        state.label.userInteractionEnabled = NO;
+        state.label.isAccessibilityElement = NO;
+        state.label.backgroundColor = UIColor.clearColor;
+        state.label.numberOfLines = 1;
+        state.label.adjustsFontSizeToFitWidth = YES;
+        state.label.minimumScaleFactor = 0.55;
+        state.label.baselineAdjustment = UIBaselineAdjustmentAlignCenters;
+        state.label.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        state.label.layer.zPosition = 10000;
+        objc_setAssociatedObject(state.label, &BannerKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(view, &JetfuelStateKey, state, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (!JetfuelHosts) JetfuelHosts = [NSHashTable weakObjectsHashTable];
+        [JetfuelHosts addObject:view];
+    }
+    if (![state.english isEqualToString:english]) {
+        if (state.english && ![view.accessibilityLabel isEqualToString:Translations()[state.english]])
+            state.originalAccessibility = view.accessibilityLabel;
+        state.english = english;
+        state.label.text = Translations()[english];
+        JetfuelChanges++;
+        NativeChanges++;
+    }
+    CGRect frame = [inks.firstObject convertRect:inks.firstObject.bounds toView:view];
+    frame = CGRectIntersection(view.bounds, frame);
+    if (CGRectIsEmpty(frame) || CGRectIsNull(frame)) frame = view.bounds;
+    state.label.frame = frame;
+    CGFloat size = MAX(10, MIN(22, frame.size.height * 0.78));
+    BOOL heading = [@[@"Creator Studio", @"Programs", @"Tools", @"Support"] containsObject:english];
+    BOOL badge = [english isEqualToString:@"New"] || [english isEqualToString:@"Ineligible"];
+    BOOL secondary = [@[@"Earn from your posts", @"Top posts by engagement",
+                         @"Tips and guides for creators"] containsObject:english];
+    state.label.font = [UIFont systemFontOfSize:size weight:heading ? UIFontWeightBold : UIFontWeightRegular];
+    state.label.textColor = secondary ? UIColor.secondaryLabelColor : UIColor.labelColor;
+    if ([english isEqualToString:@"Ineligible"]) state.label.textColor = UIColor.tertiaryLabelColor;
+    if ([english isEqualToString:@"New"]) state.label.textColor = UIColor.whiteColor;
+    state.label.textAlignment = (badge || [english isEqualToString:@"Creator Studio"]) ?
+        NSTextAlignmentCenter : NSTextAlignmentNatural;
+    // Hide only the proven custom ink views. Never hide/replace the row, icon or tap target.
+    for (UIView *ink in inks) {
+        if (![state.inkAlphas objectForKey:ink]) [state.inkAlphas setObject:@(ink.alpha) forKey:ink];
+        ink.alpha = 0;
+    }
+    if (state.label.superview != view) [view addSubview:state.label];
+    [view bringSubviewToFront:state.label];
+    view.accessibilityLabel = Translations()[english];
+    return YES;
+}
+
 static NSString *JavaScript(void) {
     static NSString *script;
     static dispatch_once_t once;
@@ -190,8 +313,14 @@ static void LocalizeWindow(UIWindow *window) {
     for (id node in nodes) GatherObject(node, texts);
     GatherLayer(window.layer, texts);
     LastPageMatched = PageMatches(texts);
-    if (!LastPageMatched) return;
+    if (!LastPageMatched) { CleanupJetfuel(window, [NSSet set]); return; }
+    NSMutableSet<UIView *> *activeJetfuel = [NSMutableSet set];
     for (UIView *view in views) {
+        if (IsJetfuelHost(view)) {
+            if (TranslateJetfuel(view)) [activeJetfuel addObject:view];
+            continue;
+        }
+        if (IsJetfuelInk(view)) continue;
         // Leave user-editable text untouched.
         if ([view isKindOfClass:UITextView.class] || [view isKindOfClass:UITextField.class]) continue;
         NSUInteger before = NativeChanges;
@@ -211,6 +340,7 @@ static void LocalizeWindow(UIWindow *window) {
             [view setNeedsLayout];
         }
     }
+    CleanupJetfuel(window, activeJetfuel);
     for (id node in nodes) TranslateObject(node);
     TranslateLayer(window.layer);
     NSString *title = Replacement(controller.title);
@@ -261,8 +391,8 @@ static NSString *DiagnosticReport(UIWindow *window) {
     for (NSString *english in [[Translations() allKeys] sortedArrayUsingSelector:@selector(compare:)])
         if (HasText(texts, english)) [anchors addObject:english];
     NSMutableString *report = [NSMutableString stringWithFormat:
-        @"版本 0.3 · 已加载\n页面匹配：%@\n原生替换：%lu / 网页替换：%lu\n视图：%lu / 节点：%lu / 网页：%lu\n网页错误码：%ld\n页面类型：%@\n识别菜单项：%@\n\n控件类型（可向下滚动）：\n",
-        PageMatches(texts) ? @"是" : @"否", (unsigned long)NativeChanges, (unsigned long)WebChanges,
+        @"版本 0.4 · 已加载\n页面匹配：%@\n原生替换：%lu / 网页替换：%lu\nJetfuel 自绘替换：%lu\n视图：%lu / 节点：%lu / 网页：%lu\n网页错误码：%ld\n页面类型：%@\n识别菜单项：%@\n\n控件类型（可向下滚动）：\n",
+        PageMatches(texts) ? @"是" : @"否", (unsigned long)NativeChanges, (unsigned long)WebChanges, (unsigned long)JetfuelChanges,
         (unsigned long)views.count, (unsigned long)nodes.count, (unsigned long)webCount,
         (long)LastWebError, NSStringFromClass(controller.class),
         anchors.count ? [anchors componentsJoinedByString:@", "] : @"无"];
@@ -323,7 +453,7 @@ static NSString *DiagnosticReport(UIWindow *window) {
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.clearColor;
     self.toggleButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.toggleButton setTitle:@"中文诊断 v0.3" forState:UIControlStateNormal];
+    [self.toggleButton setTitle:@"中文诊断 v0.4" forState:UIControlStateNormal];
     self.toggleButton.backgroundColor = UIColor.systemBlueColor;
     [self.toggleButton setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     self.toggleButton.layer.cornerRadius = 10;
@@ -367,7 +497,7 @@ static NSString *DiagnosticReport(UIWindow *window) {
 }
 - (void)toggle {
     self.panel.hidden = !self.panel.hidden;
-    [self.toggleButton setTitle:self.panel.hidden ? @"中文诊断 v0.3" : @"关闭诊断"
+    [self.toggleButton setTitle:self.panel.hidden ? @"中文诊断 v0.4" : @"关闭诊断"
         forState:UIControlStateNormal];
     if (!self.panel.hidden) [self refresh];
 }
@@ -426,7 +556,7 @@ static void EnsureDiagnosticWindow(UIWindow *source) {
         UILabel *banner = [[UILabel alloc] initWithFrame:CGRectMake(16, window.safeAreaInsets.top + 8,
             MAX(120, window.bounds.size.width - 32), 40)];
         objc_setAssociatedObject(banner, &BannerKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        banner.text = @"中文插件 v0.3 已加载 · 右上角可诊断";
+        banner.text = @"中文插件 v0.4 已加载 · 右上角可诊断";
         banner.textAlignment = NSTextAlignmentCenter;
         banner.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
         banner.backgroundColor = UIColor.systemBlueColor;

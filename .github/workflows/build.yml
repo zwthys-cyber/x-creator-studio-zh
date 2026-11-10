@@ -52,7 +52,7 @@ jobs:
             -mios-simulator-version-min=15.0 -fobjc-arc -fmodules \
             tests/FixtureApp.m -framework UIKit -framework Foundation \
             -framework WebKit -framework QuartzCore -o fixture.app/Fixture
-          python3 -c 'import plistlib; plistlib.dump(dict(CFBundleExecutable="Fixture", CFBundleIdentifier="dev.xcszh.fixture", CFBundleName="Fixture", CFBundlePackageType="APPL", CFBundleVersion="1", CFBundleShortVersionString="0.3", LSRequiresIPhoneOS=True, UIDeviceFamily=[1,2], UILaunchScreen={}), open("fixture.app/Info.plist","wb"))'
+          python3 -c 'import plistlib; plistlib.dump(dict(CFBundleExecutable="Fixture", CFBundleIdentifier="dev.xcszh.fixture", CFBundleName="Fixture", CFBundlePackageType="APPL", CFBundleVersion="1", CFBundleShortVersionString="0.4", LSRequiresIPhoneOS=True, UIDeviceFamily=[1,2], UILaunchScreen={}), open("fixture.app/Info.plist","wb"))'
           codesign --force --sign - fixture.app
           xcrun simctl install "$DEVICE" fixture.app
           xcrun simctl launch "$DEVICE" dev.xcszh.fixture
@@ -62,11 +62,19 @@ jobs:
             sleep 2
           done
           cp "$CONTAINER/Documents/result.json" dist/FIXTURE_RESULTS.json
+          cp "$CONTAINER/Documents/JETFUEL_LIGHT.png" dist/
+          cp "$CONTAINER/Documents/JETFUEL_DARK.png" dist/
           cat dist/FIXTURE_RESULTS.json
           python3 -c 'import json; r=json.load(open("dist/FIXTURE_RESULTS.json")); assert r["passed"], r'
+      - name: Verify rendered Chinese in light and dark fixture images
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swiftc tests/CheckRaster.swift -o /tmp/xcszh-check-raster
+          /tmp/xcszh-check-raster dist/JETFUEL_LIGHT.png dist/JETFUEL_DARK.png
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: XCreatorStudioZH-v0.3
+          name: XCreatorStudioZH-v0.4
           path: dist/
           retention-days: 14
           if-no-files-found: error
