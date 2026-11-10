@@ -311,7 +311,7 @@ static NSString *DiagnosticReport(UIWindow *window) {
 @interface XCSZHOverlayController : UIViewController
 @property(nonatomic, weak) UIWindow *sourceWindow;
 @property(nonatomic, strong) UIButton *toggleButton;
-@property(nonatomic, strong) UIButton *copyButton;
+@property(nonatomic, strong) UIButton *clipboardButton;
 @property(nonatomic, strong) UIButton *refreshButton;
 @property(nonatomic, strong) UIView *panel;
 @property(nonatomic, strong) UITextView *reportView;
@@ -337,10 +337,10 @@ static NSString *DiagnosticReport(UIWindow *window) {
     self.panel.layer.borderColor = UIColor.systemBlueColor.CGColor;
     self.panel.hidden = YES;
     [self.view addSubview:self.panel];
-    self.copyButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    [self.copyButton setTitle:@"复制诊断" forState:UIControlStateNormal];
-    [self.copyButton addTarget:self action:@selector(copyReport) forControlEvents:UIControlEventTouchUpInside];
-    [self.panel addSubview:self.copyButton];
+    self.clipboardButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.clipboardButton setTitle:@"复制诊断" forState:UIControlStateNormal];
+    [self.clipboardButton addTarget:self action:@selector(putReportOnClipboard) forControlEvents:UIControlEventTouchUpInside];
+    [self.panel addSubview:self.clipboardButton];
     self.refreshButton = [UIButton buttonWithType:UIButtonTypeSystem];
     [self.refreshButton setTitle:@"刷新" forState:UIControlStateNormal];
     [self.refreshButton addTarget:self action:@selector(refresh) forControlEvents:UIControlEventTouchUpInside];
@@ -360,7 +360,7 @@ static NSString *DiagnosticReport(UIWindow *window) {
     CGFloat panelTop = top + 44;
     self.panel.frame = CGRectMake(8, panelTop, MAX(100, width - 16),
         MAX(100, self.view.bounds.size.height - panelTop - self.view.safeAreaInsets.bottom - 12));
-    self.copyButton.frame = CGRectMake(8, 4, 110, 40);
+    self.clipboardButton.frame = CGRectMake(8, 4, 110, 40);
     self.refreshButton.frame = CGRectMake(120, 4, 70, 40);
     self.reportView.frame = CGRectMake(6, 46, self.panel.bounds.size.width - 12,
         MAX(40, self.panel.bounds.size.height - 52));
@@ -379,9 +379,9 @@ static NSString *DiagnosticReport(UIWindow *window) {
     LocalizeWindow(source);
     self.reportView.text = DiagnosticReport(source);
 }
-- (void)copyReport {
+- (void)putReportOnClipboard {
     UIPasteboard.generalPasteboard.string = self.reportView.text ?: @"";
-    [self.copyButton setTitle:@"已复制" forState:UIControlStateNormal];
+    [self.clipboardButton setTitle:@"已复制" forState:UIControlStateNormal];
 }
 @end
 static XCSZHOverlayWindow *DiagnosticWindow;
